@@ -1,3 +1,4 @@
+
 /* app.css */
 
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap');
@@ -219,20 +220,47 @@ canvas:hover::before {
   animation: pulseDetection 2s infinite;
 }
 
-/* Mobile responsive */
+/* Mobile-specific canvas styles */
+.mobile-canvas {
+  border-radius: 12px !important;
+  max-width: 100vw !important;
+  margin: 0 auto;
+}
+
+.mobile-canvas::before {
+  border-radius: 14px !important;
+}
+
+/* Touch-friendly mobile optimizations */
 @media (max-width: 768px) {
+  body {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
   .App {
-    padding: 15px;
+    padding: 10px;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 
   h1 {
     margin-bottom: 1.5rem;
     letter-spacing: 1px;
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
   }
 
   canvas {
     border-radius: 15px;
     max-width: 98vw;
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
   }
 
   canvas::before {
@@ -245,6 +273,12 @@ canvas:hover::before {
 
   .floating-orb {
     display: none; /* Hide on mobile for performance */
+  }
+
+  /* Оптимизация для iOS Safari */
+  canvas {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
   }
 }
 
@@ -261,6 +295,12 @@ canvas:hover::before {
   canvas::before {
     border-radius: 14px;
   }
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Loading animation for when camera is starting */
