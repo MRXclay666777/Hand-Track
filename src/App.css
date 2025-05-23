@@ -1,3 +1,4 @@
+
 /* app.css */
 
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap');
@@ -28,6 +29,7 @@ body {
   position: relative;
 }
 
+/* Animated background particles */
 body::before {
   content: '';
   position: fixed;
@@ -62,6 +64,7 @@ body::before {
   position: relative;
 }
 
+/* Futuristic title */
 h1 {
   font-size: clamp(1.8rem, 5vw, 3.5rem);
   font-weight: 900;
@@ -104,6 +107,7 @@ h1::before {
   100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.05); }
 }
 
+/* Enhanced canvas with glassmorphism */
 canvas {
   border: 2px solid transparent;
   border-radius: 20px;
@@ -116,12 +120,12 @@ canvas {
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   max-width: 95vw;
   height: auto;
-  aspect-ratio: 4 / 3; /* Добавляем пропорции для стабильности */
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
 
+/* Animated border effect */
 canvas::before {
   content: '';
   position: absolute;
@@ -149,6 +153,7 @@ canvas::before {
   100% { background-position: 0% 50%; }
 }
 
+/* Enhanced hover effects */
 canvas:hover {
   transform: scale(1.02) rotateX(2deg);
   box-shadow: 
@@ -163,6 +168,7 @@ canvas:hover::before {
   animation-duration: 1.5s;
 }
 
+/* Floating elements */
 .floating-orb {
   position: absolute;
   border-radius: 50%;
@@ -203,6 +209,7 @@ canvas:hover::before {
   50% { transform: translateY(-20px) scale(1.1); opacity: 0.8; }
 }
 
+/* Pulse effect for active detection */
 @keyframes pulseDetection {
   0% { box-shadow: 0 0 0 0 rgba(0, 249, 255, 0.7); }
   70% { box-shadow: 0 0 0 20px rgba(0, 249, 255, 0); }
@@ -213,6 +220,7 @@ canvas:hover::before {
   animation: pulseDetection 2s infinite;
 }
 
+/* Mobile-specific canvas styles */
 .mobile-canvas {
   border-radius: 12px !important;
   max-width: 100vw !important;
@@ -223,6 +231,7 @@ canvas:hover::before {
   border-radius: 14px !important;
 }
 
+/* Touch-friendly mobile optimizations */
 @media (max-width: 768px) {
   body {
     -webkit-user-select: none;
@@ -263,9 +272,10 @@ canvas:hover::before {
   }
 
   .floating-orb {
-    display: none;
+    display: none; /* Hide on mobile for performance */
   }
 
+  /* Оптимизация для iOS Safari */
   canvas {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
@@ -287,30 +297,15 @@ canvas:hover::before {
   }
 }
 
+/* Loading spinner animation */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-.loading-container {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: var(--neon-cyan);
-  text-align: center;
-  z-index: 1000;
-  font-weight: 500;
-}
-
-.loading-spinner {
-  width: 50px;
-  height: 50px;
-  border: 3px solid rgba(0, 249, 255, 0.3);
-  border-top: 3px solid var(--neon-cyan);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 20px;
+/* Loading animation for when camera is starting */
+.loading-pulse {
+  animation: loadingPulse 1.5s ease-in-out infinite;
 }
 
 @keyframes loadingPulse {
@@ -318,36 +313,7 @@ canvas:hover::before {
   50% { opacity: 0.5; }
 }
 
-.error-message {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: var(--neon-pink);
-  text-align: center;
-  padding: 20px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  max-width: 90vw;
-}
-
-.error-message h3 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-  text-shadow: 0 0 10px rgba(255, 0, 110, 0.5);
-}
-
-.error-message p {
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
