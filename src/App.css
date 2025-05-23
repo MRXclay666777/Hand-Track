@@ -1,4 +1,3 @@
-
 /* app.css */
 
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap');
@@ -29,7 +28,7 @@ body {
   position: relative;
 }
 
-/* Animated background particles */
+/* Simplified animated background particles */
 body::before {
   content: '';
   position: fixed;
@@ -43,14 +42,12 @@ body::before {
     radial-gradient(circle at 40% 40%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
   animation: backgroundShift 15s ease-in-out infinite;
   pointer-events: none;
-  z-index: -1;
+  z-index: -2;
 }
 
 @keyframes backgroundShift {
   0%, 100% { transform: translateX(0) translateY(0) scale(1); }
-  25% { transform: translateX(-10px) translateY(-10px) scale(1.02); }
-  50% { transform: translateX(10px) translateY(-5px) scale(0.98); }
-  75% { transform: translateX(-5px) translateY(10px) scale(1.01); }
+  50% { transform: translateX(10px) translateY(-5px) scale(1.01); }
 }
 
 .App {
@@ -62,6 +59,7 @@ body::before {
   padding: 20px;
   text-align: center;
   position: relative;
+  z-index: 0;
 }
 
 /* Futuristic title */
@@ -74,11 +72,9 @@ h1 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: gradientShift 3s ease-in-out infinite;
   text-shadow: 
     0 0 10px rgba(0, 249, 255, 0.5),
-    0 0 20px rgba(255, 0, 110, 0.3),
-    0 0 30px rgba(139, 92, 246, 0.2);
+    0 0 20px rgba(255, 0, 110, 0.3);
   letter-spacing: 2px;
   position: relative;
 }
@@ -97,35 +93,27 @@ h1::before {
   animation: titleGlow 2s ease-in-out infinite alternate;
 }
 
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
 @keyframes titleGlow {
-  0% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.05); }
+  0% { opacity: 0.3; }
+  100% { opacity: 0.7; }
 }
 
-/* Enhanced canvas with glassmorphism */
+/* Optimized canvas with glassmorphism */
 canvas {
   border: 2px solid transparent;
   border-radius: 20px;
   background: var(--glass-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    0 0 0 1px var(--glass-border),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   max-width: 95vw;
   height: auto;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  overflow: hidden;
+  z-index: 1;
+  overflow: visible;
 }
 
-/* Animated border effect */
+/* Simplified animated border effect */
 canvas::before {
   content: '';
   position: absolute;
@@ -133,42 +121,20 @@ canvas::before {
   left: -2px;
   right: -2px;
   bottom: -2px;
-  background: linear-gradient(45deg, 
-    var(--neon-cyan), 
-    var(--neon-pink), 
-    var(--neon-purple), 
-    var(--neon-green),
-    var(--neon-cyan)
-  );
-  background-size: 400% 400%;
+  background: linear-gradient(45deg, var(--neon-cyan), var(--neon-pink));
+  background-size: 200% 200%;
   border-radius: 22px;
   z-index: -1;
   animation: borderFlow 3s linear infinite;
-  opacity: 0.8;
+  opacity: 0.6;
 }
 
 @keyframes borderFlow {
   0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
 }
 
-/* Enhanced hover effects */
-canvas:hover {
-  transform: scale(1.02) rotateX(2deg);
-  box-shadow: 
-    0 20px 60px rgba(0, 0, 0, 0.4),
-    0 0 40px rgba(0, 249, 255, 0.3),
-    0 0 80px rgba(255, 0, 110, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-canvas:hover::before {
-  opacity: 1;
-  animation-duration: 1.5s;
-}
-
-/* Floating elements */
+/* Floating elements (disabled on mobile by default) */
 .floating-orb {
   position: absolute;
   border-radius: 50%;
@@ -206,7 +172,7 @@ canvas:hover::before {
 
 @keyframes float {
   0%, 100% { transform: translateY(0) scale(1); opacity: 0.3; }
-  50% { transform: translateY(-20px) scale(1.1); opacity: 0.8; }
+  50% { transform: translateY(-20px) scale(1.1); opacity: 0.6; }
 }
 
 /* Pulse effect for active detection */
@@ -221,17 +187,6 @@ canvas:hover::before {
 }
 
 /* Mobile-specific canvas styles */
-.mobile-canvas {
-  border-radius: 12px !important;
-  max-width: 100vw !important;
-  margin: 0 auto;
-}
-
-.mobile-canvas::before {
-  border-radius: 14px !important;
-}
-
-/* Touch-friendly mobile optimizations */
 @media (max-width: 768px) {
   body {
     -webkit-user-select: none;
@@ -261,21 +216,21 @@ canvas:hover::before {
     height: auto;
     display: block;
     margin: 0 auto;
+    overflow: visible;
   }
 
   canvas::before {
     border-radius: 17px;
   }
 
-  canvas:hover {
-    transform: scale(1.01);
-  }
-
   .floating-orb {
-    display: none; /* Hide on mobile for performance */
+    display: none;
   }
 
-  /* Оптимизация для iOS Safari */
+  body::before {
+    display: none;
+  }
+
   canvas {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
@@ -330,3 +285,5 @@ canvas:hover::before {
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(var(--neon-pink), var(--neon-purple));
 }
+
+/* Убедились, что нет пустых rulesets */
