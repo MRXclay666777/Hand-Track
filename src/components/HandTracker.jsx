@@ -9,19 +9,23 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cameraPermission, setCameraPermission] = useState(null);
-  const [handColor, setHandColor] = useState('#FFFF00');
-  const colors = ['#FFFF00', '#FFD700', '#FFA500', '#FF4500'];
+  const handColorRef = useRef('#FFFF00');
+  const colors = ['#FFFF00', '#00FFFF', '#FF00FF', '#39FF14', '#FF4500', '#FF69B4'];
   const [colorIndex, setColorIndex] = useState(0);
   const particlesRef = useRef([]);
+  const trailsRef = useRef([]);
+  const lightningTrailsRef = useRef([]);
+  const lastHandPositionsRef = useRef([]); // Массив для хранения позиций всех рук
   const sphereStateRef = useRef({ active: false, radius: 0, centerX: 0, centerY: 0 });
   const lightningShotRef = useRef([]);
-  const lastGestureRef = useRef(null);
+  const arrowShotRef = useRef([]);
+  const lastGestureRef = useRef([]); // Массив для хранения жестов каждой руки
   const canvasCtxRef = useRef(null);
 
   const changeColor = () => {
     const nextIndex = (colorIndex + 1) % colors.length;
     setColorIndex(nextIndex);
-    setHandColor(colors[nextIndex]);
+    handColorRef.current = colors[nextIndex];
   };
 
   const distance = (p1, p2) => {
@@ -76,14 +80,24 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
       console.log('Detected: Fuck 🤟');
       return "Fuck 🤟";
     }
+    const thumbTip = landmarks[4];
+    const indexTip = landmarks[8];
+    const thumbBase = landmarks[2];
+    const indexBase = landmarks[6];
+    const thumbToIndex = distance(thumbTip, indexTip);
+    const isHeart = thumbToIndex < 0.05 && thumbTip.y < thumbBase.y && indexTip.y < indexBase.y;
+    if (isHeart) {
+      console.log('Detected: Heart 💖');
+      return "Heart 💖";
+    }
     return null;
   };
 
-  const drawLightning = (ctx, start, end, isMobile, intensity = 20) => {
+  const drawLightning = (ctx, start, end, isMobile, intensity = 40) => {
     console.log('Drawing Lightning!');
     ctx.beginPath();
-    ctx.strokeStyle = handColor;
-    ctx.lineWidth = isMobile ? 2 : 3;
+    ctx.strokeStyle = handColorRef.current;
+    ctx.lineWidth = isMobile ? 3 : 5;
     ctx.lineCap = 'round';
 
     const points = [start];
@@ -105,11 +119,165 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
     }
 
     if (!isMobile) {
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = handColor;
+      ctx.shadowBlur = 80;
+      ctx.shadowColor = handColorRef.current;
     }
     ctx.stroke();
     ctx.shadowBlur = 0;
+  };
+
+  const drawArrow = (ctx, startX, startY, endX, endY, isMobile) => {
+    console.log('Drawing Arrow!');
+    ctx.beginPath();
+    ctx.strokeStyle = '#FF4500';
+    ctx.lineWidth = isMobile ? 4 : 6;
+    ctx.lineCap = 'round';
+
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    
+    const angle = Math.atan2(endY - startY, endX - startX);
+    const headLength = 20;
+    ctx.lineTo(endX - headLength * Math.cos(angle - Math.PI / 6), endY - headLength * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(endX - headLength * Math.cos(angle + Math.PI / 6), endY - headLength * Math.sin(angle + Math.PI / 6));
+
+    if (!isMobile) {
+      ctx.shadowBlur = 80;
+      ctx.shadowColor = '#FF4500';
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const trailParticles = [];
+    for (let i = 0; i < 20; i++) {
+      const t = i / 20;
+      const x = startX + (endX - startX) * t;
+      const y = startY + (endY - startY) * t;
+      const angle = Math.random() * 2 * Math.PI;
+      const speed = Math.random() * 3 + 2;
+      trailParticles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 30,
+        size: Math.random() * 4 + 2,
+      });
+    }
+    particlesRef.current = [...particlesRef.current, ...trailParticles];
+  };
+
+  const generateTrails = (landmarks, canvasWidth, canvasHeight) => {
+    const keyPoints = [0, 4, 8, 12, 16, 20];
+    const newTrails = keyPoints.map(index => {
+      const landmark = landmarks[index];
+      const x = landmark.x * canvasWidth;
+      const y = landmark.y * canvasHeight;
+      return {
+        x,
+        y,
+        life: 40,
+        size: Math.random() * 5 + 3,
+      };
+    });
+    trailsRef.current = [...trailsRef.current, ...newTrails];
+    if (trailsRef.current.length > 30) {
+      trailsRef.current.shift();
+    }
+  };
+
+  const generateLightningTrails = (landmarks, canvasWidth, canvasHeight) => {
+    const wrist = landmarks[0];
+    const x = wrist.x * canvasWidth;
+    const y = wrist.y * canvasHeight;
+    const newTrail = {
+      x,
+      y,
+      life: 25,
+      size: Math.random() * 4 + 2,
+    };
+    lightningTrailsRef.current = [...lightningTrailsRef.current, newTrail];
+    if (lightningTrailsRef.current.length > 40) {
+      lightningTrailsRef.current.shift();
+    }
+  };
+
+  const drawTrails = (ctx, isMobile) => {
+    console.log('Drawing Trails!');
+    trailsRef.current = trailsRef.current.map(trail => ({
+      ...trail,
+      life: trail.life - 1,
+    })).filter(trail => trail.life > 0);
+
+    trailsRef.current.forEach(trail => {
+      ctx.save();
+      ctx.globalAlpha = trail.life / 40;
+      const gradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, trail.size * 4);
+      gradient.addColorStop(0, handColorRef.current);
+      gradient.addColorStop(0.5, `rgba(${parseInt(handColorRef.current.slice(1, 3), 16)}, ${parseInt(handColorRef.current.slice(3, 5), 16)}, ${parseInt(handColorRef.current.slice(5, 7), 16)}, 0.5)`);
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(trail.x, trail.y, trail.size, 0, 2 * Math.PI);
+      ctx.fill();
+      if (!isMobile) {
+        ctx.shadowBlur = 70;
+        ctx.shadowColor = handColorRef.current;
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    });
+  };
+
+  const drawLightningTrails = (ctx, isMobile) => {
+    console.log('Drawing Lightning Trails!');
+    lightningTrailsRef.current = lightningTrailsRef.current.map(trail => ({
+      ...trail,
+      life: trail.life - 1,
+    })).filter(trail => trail.life > 0);
+
+    for (let i = 0; i < lightningTrailsRef.current.length - 1; i++) {
+      const start = lightningTrailsRef.current[i];
+      const end = lightningTrailsRef.current[i + 1];
+      if (start.life > 0 && end.life > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(start.life, end.life) / 25;
+        ctx.beginPath();
+        ctx.strokeStyle = handColorRef.current;
+        ctx.lineWidth = 4;
+        const midX = (start.x + end.x) / 2 + (Math.random() - 0.5) * 30;
+        const midY = (start.y + end.y) / 2 + (Math.random() - 0.5) * 30;
+        ctx.moveTo(start.x, start.y);
+        ctx.quadraticCurveTo(midX, midY, end.x, end.y);
+        if (!isMobile) {
+          ctx.shadowBlur = 100;
+          ctx.shadowColor = handColorRef.current;
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+
+    lightningTrailsRef.current.forEach(trail => {
+      ctx.save();
+      ctx.globalAlpha = trail.life / 25;
+      const gradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, trail.size * 5);
+      gradient.addColorStop(0, handColorRef.current);
+      gradient.addColorStop(0.7, `rgba(${parseInt(handColorRef.current.slice(1, 3), 16)}, ${parseInt(handColorRef.current.slice(3, 5), 16)}, ${parseInt(handColorRef.current.slice(5, 7), 16)}, 0.3)`);
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(trail.x, trail.y, trail.size * 1.5, 0, 2 * Math.PI);
+      ctx.fill();
+      if (!isMobile) {
+        ctx.shadowBlur = 120;
+        ctx.shadowColor = handColorRef.current;
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    });
   };
 
   const triggerLightningShot = (wristX, wristY, canvasWidth) => {
@@ -125,6 +293,19 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
       });
     }
     lightningShotRef.current = [...lightningShotRef.current, ...shots];
+  };
+
+  const triggerArrowShot = (wristX, wristY, canvasWidth) => {
+    console.log('Triggering Arrow Shot!');
+    const arrows = [];
+    arrows.push({
+      startX: wristX,
+      startY: wristY,
+      endX: wristX + canvasWidth * 0.9,
+      endY: wristY + (Math.random() - 0.5) * 100,
+      duration: 50,
+    });
+    arrowShotRef.current = [...arrowShotRef.current, ...arrows];
   };
 
   const triggerSphere = (centerX, centerY) => {
@@ -172,6 +353,11 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
       ...shot,
       duration: shot.duration - 1,
     })).filter(shot => shot.duration > 0);
+
+    arrowShotRef.current = arrowShotRef.current.map(arrow => ({
+      ...arrow,
+      duration: arrow.duration - 1,
+    })).filter(arrow => arrow.duration > 0);
   };
 
   useEffect(() => {
@@ -194,10 +380,11 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
       });
 
       handsRef.current.setOptions({
-        maxNumHands: 2,
+        maxNumHands: 4, // Увеличил до 4 рук
         modelComplexity: isMobile ? 0 : 1,
-        minDetectionConfidence: isMobile ? 0.6 : 0.7,
-        minTrackingConfidence: isMobile ? 0.6 : 0.7,
+        minDetectionConfidence: isMobile ? 0.2 : 0.3,
+        minTrackingConfidence: isMobile ? 0.2 : 0.3,
+        selfieMode: true,
       });
 
       const render = () => {
@@ -213,13 +400,13 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
 
         const ctx = canvasCtxRef.current;
         ctx.save();
-        ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        ctx.scale(-1, 1);
-        ctx.translate(-canvasElement.width, 0);
-        ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillRect(0, 0, canvasElement.width, canvasElement.height);
 
         animateEffects();
+
+        drawTrails(ctx, isMobile);
+        drawLightningTrails(ctx, isMobile);
 
         if (sphereStateRef.current.active) {
           console.log('Drawing Sphere!');
@@ -233,17 +420,17 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
             sphereStateRef.current.centerY,
             sphereStateRef.current.radius
           );
-          gradient.addColorStop(0, handColor);
+          gradient.addColorStop(0, handColorRef.current);
           gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
           ctx.fillStyle = gradient;
           ctx.beginPath();
           ctx.arc(sphereStateRef.current.centerX, sphereStateRef.current.centerY, sphereStateRef.current.radius, 0, 2 * Math.PI);
           ctx.fill();
           if (!isMobile) {
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = handColor;
-            ctx.strokeStyle = handColor;
-            ctx.lineWidth = 2;
+            ctx.shadowBlur = 70;
+            ctx.shadowColor = handColorRef.current;
+            ctx.strokeStyle = handColorRef.current;
+            ctx.lineWidth = 3;
             ctx.stroke();
           }
           ctx.globalAlpha = 1;
@@ -255,13 +442,13 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
           particlesRef.current.forEach(p => {
             ctx.save();
             ctx.globalAlpha = p.life / 80;
-            ctx.fillStyle = handColor;
+            ctx.fillStyle = p.life > 40 ? '#FF4500' : handColorRef.current;
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size, 0, 2 * Math.PI);
             ctx.fill();
             if (!isMobile) {
-              ctx.shadowBlur = 10;
-              ctx.shadowColor = handColor;
+              ctx.shadowBlur = 30;
+              ctx.shadowColor = p.life > 40 ? '#FF4500' : handColorRef.current;
             }
             ctx.globalAlpha = 1;
             ctx.restore();
@@ -275,47 +462,83 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
           });
         }
 
-        handsRef.current.onResults((results) => {
-          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-              const landmarks = results.multiHandLandmarks[i];
-              const flippedLandmarks = landmarks.map(landmark => ({
-                ...landmark,
-                x: 1 - landmark.x
-              }));
+        if (arrowShotRef.current.length > 0) {
+          console.log('Drawing Arrow Shots!');
+          arrowShotRef.current.forEach(arrow => {
+            drawArrow(ctx, arrow.startX, arrow.startY, arrow.endX, arrow.endY, isMobile);
+          });
+        }
 
-              const lightningPoints = [0, 4, 8, 12, 16, 20];
-              for (let j = 0; j < lightningPoints.length - 1; j++) {
-                for (let k = j + 1; k < lightningPoints.length; k++) {
-                  if (Math.random() > 0.7) {
-                    const start = {
-                      x: flippedLandmarks[lightningPoints[j]].x * canvasElement.width,
-                      y: flippedLandmarks[lightningPoints[j]].y * canvasElement.height
-                    };
-                    const end = {
-                      x: flippedLandmarks[lightningPoints[k]].x * canvasElement.width,
-                      y: flippedLandmarks[lightningPoints[k]].y * canvasElement.height
-                    };
-                    drawLightning(ctx, start, end, isMobile);
-                  }
+        handsRef.current.onResults((results) => {
+          let handsToDraw = [];
+
+          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            handsToDraw = results.multiHandLandmarks.slice(0, 4); // Ограничиваем до 4 рук
+            lastHandPositionsRef.current = handsToDraw; // Сохраняем все руки
+          } else if (lastHandPositionsRef.current.length > 0) {
+            handsToDraw = lastHandPositionsRef.current; // Используем последние известные позиции
+          }
+
+          handsToDraw.forEach((landmarks, handIndex) => {
+            const flippedLandmarks = landmarks.map(landmark => ({
+              ...landmark,
+              x: landmark.x,
+              y: landmark.y
+            }));
+
+            generateTrails(landmarks, canvasElement.width, canvasElement.height);
+            generateLightningTrails(landmarks, canvasElement.width, canvasElement.height);
+
+            const lightningPoints = [0, 4, 8, 12, 16, 20];
+            for (let j = 0; j < lightningPoints.length - 1; j++) {
+              for (let k = j + 1; k < lightningPoints.length; k++) {
+                if (Math.random() > 0.7) {
+                  const start = {
+                    x: flippedLandmarks[lightningPoints[j]].x * canvasElement.width,
+                    y: flippedLandmarks[lightningPoints[j]].y * canvasElement.height
+                  };
+                  const end = {
+                    x: flippedLandmarks[lightningPoints[k]].x * canvasElement.width,
+                    y: flippedLandmarks[lightningPoints[k]].y * canvasElement.height
+                  };
+                  drawLightning(ctx, start, end, isMobile);
                 }
               }
+            }
 
-              const fingerPaths = [
-                [0, 1, 2, 3, 4],
-                [0, 5, 6, 7, 8],
-                [0, 9, 10, 11, 12],
-                [0, 13, 14, 15, 16],
-                [0, 17, 18, 19, 20]
-              ];
+            const fingerPaths = [
+              [0, 1, 2, 3, 4],
+              [0, 5, 6, 7, 8],
+              [0, 9, 10, 11, 12],
+              [0, 13, 14, 15, 16],
+              [0, 17, 18, 19, 20]
+            ];
 
-              fingerPaths.forEach((path, idx) => {
+            fingerPaths.forEach((path, idx) => {
+              ctx.beginPath();
+              const color = colors[(idx + handIndex) % colors.length]; // Разные цвета для разных рук
+              ctx.strokeStyle = color;
+              ctx.lineWidth = isMobile ? 3 : 5;
+              ctx.lineCap = 'round';
+
+              path.forEach((pointIdx, j) => {
+                const landmark = flippedLandmarks[pointIdx];
+                const x = landmark.x * canvasElement.width;
+                const y = landmark.y * canvasElement.height;
+                if (j === 0) {
+                  ctx.moveTo(x, y);
+                } else {
+                  ctx.lineTo(x, y);
+                }
+              });
+              ctx.stroke();
+
+              if (!isMobile) {
                 ctx.beginPath();
-                const color = colors[idx % colors.length];
                 ctx.strokeStyle = color;
-                ctx.lineWidth = isMobile ? 2 : 3;
-                ctx.lineCap = 'round';
-
+                ctx.lineWidth = isMobile ? 4 : 6;
+                ctx.shadowBlur = 90;
+                ctx.shadowColor = color;
                 path.forEach((pointIdx, j) => {
                   const landmark = flippedLandmarks[pointIdx];
                   const x = landmark.x * canvasElement.width;
@@ -327,100 +550,85 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
                   }
                 });
                 ctx.stroke();
-
-                if (!isMobile) {
-                  ctx.beginPath();
-                  ctx.strokeStyle = color;
-                  ctx.lineWidth = isMobile ? 3 : 4;
-                  ctx.shadowBlur = 15;
-                  ctx.shadowColor = color;
-                  path.forEach((pointIdx, j) => {
-                    const landmark = flippedLandmarks[pointIdx];
-                    const x = landmark.x * canvasElement.width;
-                    const y = landmark.y * canvasElement.height;
-                    if (j === 0) {
-                      ctx.moveTo(x, y);
-                    } else {
-                      ctx.lineTo(x, y);
-                    }
-                  });
-                  ctx.stroke();
-                  ctx.shadowBlur = 0;
-                }
-              });
-
-              drawConnectors(ctx, flippedLandmarks, Hands.HAND_CONNECTIONS, {
-                color: handColor,
-                lineWidth: isMobile ? 3 : 4,
-              });
-
-              drawLandmarks(ctx, flippedLandmarks, {
-                color: handColor,
-                lineWidth: isMobile ? 2 : 3,
-                radius: isMobile ? 4 : 6,
-              });
-
-              if (!isMobile) {
-                flippedLandmarks.forEach((landmark, index) => {
-                  const x = landmark.x * canvasElement.width;
-                  const y = landmark.y * canvasElement.height;
-                  const gradient = ctx.createRadialGradient(x, y, 0, x, y, 15);
-                  gradient.addColorStop(0, `rgba(${parseInt(handColor.slice(1, 3), 16)}, ${parseInt(handColor.slice(3, 5), 16)}, ${parseInt(handColor.slice(5, 7), 16)}, 0.8)`);
-                  gradient.addColorStop(0.5, `rgba(${parseInt(handColor.slice(1, 3), 16)}, ${parseInt(handColor.slice(3, 5), 16)}, ${parseInt(handColor.slice(5, 7), 16)}, 0.4)`);
-                  gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
-                  
-                  ctx.save();
-                  ctx.shadowBlur = 20;
-                  ctx.shadowColor = handColor;
-                  ctx.fillStyle = gradient;
-                  ctx.beginPath();
-                  ctx.arc(x, y, 8, 0, 2 * Math.PI);
-                  ctx.fill();
-                  ctx.restore();
-                });
+                ctx.shadowBlur = 0;
               }
+            });
 
-              const gesture = detectGesture(landmarks);
-              if (gesture) {
-                const wrist = flippedLandmarks[0];
-                const x = wrist.x * canvasElement.width;
-                const y = wrist.y * canvasElement.height - 20;
+            drawConnectors(ctx, flippedLandmarks, Hands.HAND_CONNECTIONS, {
+              color: handColorRef.current,
+              lineWidth: isMobile ? 4 : 6,
+            });
+
+            drawLandmarks(ctx, flippedLandmarks, {
+              color: handColorRef.current,
+              lineWidth: isMobile ? 3 : 5,
+              radius: isMobile ? 6 : 8,
+            });
+
+            if (!isMobile) {
+              flippedLandmarks.forEach((landmark, index) => {
+                const x = landmark.x * canvasElement.width;
+                const y = landmark.y * canvasElement.height;
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, 35);
+                gradient.addColorStop(0, `rgba(${parseInt(handColorRef.current.slice(1, 3), 16)}, ${parseInt(handColorRef.current.slice(3, 5), 16)}, ${parseInt(handColorRef.current.slice(5, 7), 16)}, 0.9)`);
+                gradient.addColorStop(0.5, `rgba(${parseInt(handColorRef.current.slice(1, 3), 16)}, ${parseInt(handColorRef.current.slice(3, 5), 16)}, ${parseInt(handColorRef.current.slice(5, 7), 16)}, 0.5)`);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                
                 ctx.save();
-                ctx.font = isMobile ? '20px Arial' : '24px Arial';
-                ctx.fillStyle = handColor;
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 2;
-                ctx.strokeText(gesture, x, y);
-                ctx.fillText(gesture, x, y);
+                ctx.shadowBlur = 110;
+                ctx.shadowColor = handColorRef.current;
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x, y, 15, 0, 2 * Math.PI);
+                ctx.fill();
                 ctx.restore();
-
-                if (gesture === "Fist ✊" && lastGestureRef.current !== "Fist ✊") {
-                  console.log('Fist detected, triggering lightning!');
-                  triggerLightningShot(x, y, canvasElement.width);
-                }
-                if (gesture === "Sphere 🟢" && lastGestureRef.current !== "Sphere 🟢") {
-                  console.log('Sphere detected, triggering sphere!');
-                  const centerX = flippedLandmarks[9].x * canvasElement.width;
-                  const centerY = flippedLandmarks[9].y * canvasElement.height;
-                  triggerSphere(centerX, centerY);
-                }
-                lastGestureRef.current = gesture;
-              } else {
-                lastGestureRef.current = null;
-              }
+              });
             }
-          }
+
+            const gesture = detectGesture(landmarks);
+            if (gesture) {
+              const wrist = flippedLandmarks[0];
+              const x = wrist.x * canvasElement.width;
+              const y = wrist.y * canvasElement.height - 20;
+              ctx.save();
+              ctx.font = isMobile ? '20px Arial' : '24px Arial';
+              ctx.fillStyle = handColorRef.current;
+              ctx.strokeStyle = '#000';
+              ctx.lineWidth = 2;
+              ctx.strokeText(gesture, x, y);
+              ctx.fillText(gesture, x, y);
+              ctx.restore();
+
+              if (gesture === "Fist ✊" && (!lastGestureRef.current[handIndex] || lastGestureRef.current[handIndex] !== "Fist ✊")) {
+                console.log(`Fist detected for hand ${handIndex}, triggering lightning!`);
+                triggerLightningShot(x, y, canvasElement.width);
+              }
+              if (gesture === "Peace ✌️" && (!lastGestureRef.current[handIndex] || lastGestureRef.current[handIndex] !== "Peace ✌️")) {
+                console.log(`Peace detected for hand ${handIndex}, triggering arrow!`);
+                triggerArrowShot(x, y, canvasElement.width);
+              }
+              if (gesture === "Sphere 🟢" && (!lastGestureRef.current[handIndex] || lastGestureRef.current[handIndex] !== "Sphere 🟢")) {
+                console.log(`Sphere detected for hand ${handIndex}, triggering sphere!`);
+                const centerX = flippedLandmarks[9].x * canvasElement.width;
+                const centerY = flippedLandmarks[9].y * canvasElement.height;
+                triggerSphere(centerX, centerY);
+              }
+              lastGestureRef.current[handIndex] = gesture;
+            } else {
+              lastGestureRef.current[handIndex] = null;
+            }
+          });
 
           const squareSize = isMobile ? 30 : 40;
           const squareX = canvasElement.width - squareSize - 10;
           const squareY = canvasElement.height - squareSize - 10;
           
           ctx.save();
-          ctx.fillStyle = handColor;
-          ctx.strokeStyle = handColor;
+          ctx.fillStyle = handColorRef.current;
+          ctx.strokeStyle = handColorRef.current;
           ctx.lineWidth = 2;
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = handColor;
+          ctx.shadowBlur = 30;
+          ctx.shadowColor = handColorRef.current;
           ctx.beginPath();
           ctx.rect(squareX, squareY, squareSize, squareSize);
           ctx.fill();
@@ -430,8 +638,6 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
           ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
           ctx.arc(squareX + squareSize / 2, squareY + squareSize / 2, squareSize / 4, 0, 2 * Math.PI);
           ctx.fill();
-          ctx.restore();
-
           ctx.restore();
         });
 
@@ -479,7 +685,7 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
             width: isMobile ? { ideal: 640 } : { ideal: 1280 },
             height: isMobile ? { ideal: 480 } : { ideal: 720 },
             facingMode: 'user',
-            frameRate: isMobile ? { ideal: 15 } : { ideal: 30 }
+            frameRate: isMobile ? { ideal: 30 } : { ideal: 60 }
           }
         };
 
@@ -526,6 +732,8 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
                   tempCanvas.width = canvasElement.width;
                   tempCanvas.height = canvasElement.height;
                   
+                  tempCtx.fillStyle = '#000000';
+                  tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
                   tempCtx.scale(-1, 1);
                   tempCtx.translate(-tempCanvas.width, 0);
                   tempCtx.drawImage(videoElement, 0, 0, tempCanvas.width, tempCanvas.height);
@@ -593,7 +801,7 @@ const HandTracker = ({ videoRef, canvasRef, botToken, chatId }) => {
         handsRef.current.close();
       }
     };
-  }, [videoRef, canvasRef, botToken, chatId, handColor]);
+  }, [videoRef, canvasRef, botToken, chatId]);
 
   if (error) {
     return (
